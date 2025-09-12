@@ -3,13 +3,18 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "fail-safe-mail",
 	"main": "src/index.js",
 	"compatibility_date": "2025-09-11",
 	"observability": {
 		"enabled": true
-	}
+	},
+	"r2_buckets": [
+		{
+			"binding": "EMAIL_STORAGE",
+			"bucket_name": "fail-safe-mail-storage"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

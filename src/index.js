@@ -12,7 +12,7 @@ export default {
 		console.log(`Processing email from ${message.from} to ${message.to}`);
 
 		// Extract the recipient email from the 'to' field
-		const recipient = message.to;
+		const recipient = message.to.toLowerCase();
 		let targetEmail = emailRouting[recipient];
 
 		// If no exact match, try catch-all routing (@domain.com)

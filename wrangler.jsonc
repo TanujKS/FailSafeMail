@@ -17,9 +17,19 @@
 	],
 	"vars": {
 		"EMAIL_ROUTING": {
+			"navin@ecofreshdrycleaner.com": "ndundigalla@gmail.com",
+			"hello@ecofreshdrycleaner.com": "ndundigalla@gmail.com",
+			"tanuj@ecofreshdrycleaner.com": "tanujsiripurapu@gmail.com",
+			"@ecofreshdrycleaner.com": "tanujsiripurapu@gmail.com",
+
+			"tanuj@tarotcardlady.net": "tanujsiripurapu@gmail.com",
+			"christine@tarotcardlady.net": "losgatosdraperylady@gmail.com",
+			"@tarotcardlady.net": "tanujsiripurapu@gmail.com",
+
 			"tanuj@draperylady.net": "tanujsiripurapu@gmail.com",
 			"christine@draperylady.net": "losgatosdraperylady@gmail.com",
 			"@draperylady.net": "tanujsiripurapu@gmail.com",
+
 			"@tanuj.xyz": "tanujsiripurapu@gmail.com",
 			"@default": "tanujsiripurapu@gmail.com"
 		}

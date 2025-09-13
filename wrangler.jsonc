@@ -14,7 +14,16 @@
 			"binding": "EMAIL_STORAGE",
 			"bucket_name": "fail-safe-mail-storage"
 		}
-	]
+	],
+	"vars": {
+		"EMAIL_ROUTING": {
+			"tanuj@draperylady.net": "tanujsiripurapu@gmail.com",
+			"christine@draperylady.net": "losgatosdraperylady@gmail.com",
+			"@draperylady.net": "tanujsiripurapu@gmail.com",
+			"@tanuj.xyz": "tanujsiripurapu@gmail.com",
+			"@default": "tanujsiripurapu@gmail.com"
+		}
+	}
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
@@ -30,7 +39,7 @@
 	 * Environment Variables
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
 	 */
-	// "vars": { "MY_VARIABLE": "production_value" }
+
 	/**
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/

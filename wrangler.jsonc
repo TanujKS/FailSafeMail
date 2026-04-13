@@ -20,8 +20,14 @@
 	"env": {
 		"debug": {
 			"vars": {
-				"DEBUG": "false"
-			}
+				"DEBUG": "true"
+			},
+			"r2_buckets": [
+				{
+					"binding": "EMAIL_STORAGE",
+					"bucket_name": "fail-safe-mail-storage"
+				}
+			]
 		}
 	}
 

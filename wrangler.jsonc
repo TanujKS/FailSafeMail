@@ -6,6 +6,7 @@
 	"name": "fail-safe-mail",
 	"main": "src/index.js",
 	"compatibility_date": "2025-09-06",
+	"preview_urls": true,
 	"observability": {
 		"enabled": true
 	},
@@ -15,7 +16,14 @@
 			"bucket_name": "fail-safe-mail-storage"
 		}
 	],
-	"vars": {}
+	"vars": {},
+	"env": {
+		"debug": {
+			"vars": {
+				"DEBUG": "false"
+			}
+		}
+	}
 
 	/**
 	 * Smart Placement

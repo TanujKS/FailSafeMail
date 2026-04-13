@@ -1,9 +1,9 @@
 /**
  * Retail Email Agent
- * 
+ *
  * An AI-powered agent that analyzes customer emails, looks up product information,
  * and generates helpful replies before forwarding emails to their destination.
- * 
+ *
  * Uses Vercel AI SDK's generateText with Zod-schema tools for proper agentic tool use.
  */
 
@@ -114,14 +114,14 @@ export class RetailEmailAgent extends Agent {
 			return null;
 		}
 	}
-	  
+
 
 	/**
 	 * Handle HTTP requests to the agent
 	 */
 	async fetch(request) {
 		const url = new URL(request.url);
-		
+
 		// Handle analyze request
 		if (url.pathname === "/internal/analyze" && request.method === "POST") {
 			const body = await request.json();
@@ -135,7 +135,7 @@ export class RetailEmailAgent extends Agent {
 				headers: { "Content-Type": "application/json" },
 			});
 		}
-		
+
 		return new Response("Not Found", { status: 404 });
 	}
 
@@ -143,7 +143,7 @@ export class RetailEmailAgent extends Agent {
 	/**
 	 * Analyze customer email and generate a reply using Vercel AI SDK's generateText
 	 * Returns: { canReply: boolean, replyContent: string, reason: string }
-	 * 
+	 *
 	 * Uses generateText with Zod-schema tools - the LLM can directly call tools
 	 * to get product information and generate a reply.
 	 * @param {Request} request - Request object for MCP connection context
@@ -161,7 +161,7 @@ export class RetailEmailAgent extends Agent {
 				try {
 					// Connect to MCP server if not already connected (pass request for context)
 					await this.connectToMcpServer(request);
-					
+
 					// Check MCP server state - find the READY SSE server specifically
 					const mcpState = this.getMcpServers();
 					const entries = Object.entries(mcpState.servers || {});

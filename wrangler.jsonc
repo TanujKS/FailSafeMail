@@ -16,19 +16,8 @@
 			"bucket_name": "fail-safe-mail-storage"
 		}
 	],
-	"vars": {},
-	"env": {
-		"debug": {
-			"vars": {
-				"DEBUG": "true"
-			},
-			"r2_buckets": [
-				{
-					"binding": "EMAIL_STORAGE",
-					"bucket_name": "fail-safe-mail-storage"
-				}
-			]
-		}
+	"vars": {
+		"DEBUG": "false"
 	}
 
 	/**

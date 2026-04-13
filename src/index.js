@@ -8,11 +8,11 @@
 import emailRouting from "../config/routes.json";
 
 function log(env, ...args) {
-	if (env.DEBUG) console.log(...args);
+	if (env.DEBUG === "true") console.log(...args);
 }
 
 function logError(env, ...args) {
-	if (env.DEBUG) console.error(...args);
+	if (env.DEBUG === "true") console.error(...args);
 }
 
 export default {

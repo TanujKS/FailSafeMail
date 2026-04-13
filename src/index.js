@@ -5,104 +5,117 @@
  * If delivery fails, saves email to R2 bucket and alerts Discord webhook
  */
 
+import emailRouting from "../config/routes.json";
+
+function log(env, ...args) {
+	if (env.DEBUG) console.log(...args);
+}
+
+function logError(env, ...args) {
+	if (env.DEBUG) console.error(...args);
+}
+
 export default {
 	async email(message, env, _ctx) {
-		// Get email routing configuration (now a proper object)
-		const emailRouting = env.EMAIL_ROUTING || {};
-		console.log(`Processing email from ${message.from} to ${message.to}`);
+		try {
+			log(env, `Processing email from ${message.from} to ${message.to}`);
 
-		// Extract the recipient email from the 'to' field
-		const recipient = message.to.toLowerCase();
-		let targetEmail = emailRouting[recipient];
+			const recipient = message.to.toLowerCase();
+			let targetEmail = emailRouting[recipient];
 
-		// If no exact match, try catch-all routing (@domain.com)
-		if (!targetEmail) {
-			const domain = recipient.split('@')[1];
-			if (domain) {
-				targetEmail = emailRouting[`@${domain}`];
+			if (!targetEmail) {
+				const domain = recipient.split('@')[1];
+				if (domain) {
+					targetEmail = emailRouting[`@${domain}`];
+					if (targetEmail) {
+						log(env, `Found catch-all rule @${domain} -> ${targetEmail}`);
+					}
+				}
+			} else {
+				log(env, `Found exact match: ${recipient} -> ${targetEmail}`);
+			}
+
+			if (!targetEmail) {
+				targetEmail = emailRouting['@default'];
 				if (targetEmail) {
-					console.log(`Found catch-all rule @${domain} -> ${targetEmail}`);
+					log(env, `Using global default: @default -> ${targetEmail}`);
 				}
 			}
-		} else {
-			console.log(`Found exact match: ${recipient} -> ${targetEmail}`);
-		}
 
-		// If still no match, try global default (@default)
-		if (!targetEmail) {
-			targetEmail = emailRouting['@default'];
-			if (targetEmail) {
-				console.log(`Using global default: @default -> ${targetEmail}`);
+			if (!targetEmail) {
+				logError(env, `No routing rule found for recipient: ${recipient}`);
+				await sendDiscordAlert(
+					message,
+					env,
+					new Error(`No routing rule found for recipient: ${recipient}`),
+					null,
+					null,
+				);
+				return;
 			}
-		}
 
-		// Check if we have a routing rule for this recipient
-		if (!targetEmail) {
-			console.error(`No routing rule found for recipient: ${recipient}`);
-			await sendDiscordAlert(
-				message,
-				env,
-				new Error(`No routing rule found for recipient: ${recipient}`),
-				null,
-				null, // No email content needed for routing rule errors
-			);
-			return;
-		}
-
-		try {
-			// Forward the email to the target address
-			await message.forward(targetEmail);
-			console.log(
-				`Email from ${message.from} to ${recipient} successfully forwarded to ${targetEmail}`,
-			);
-		} catch (error) {
-			console.error(
-				`Failed to forward email from ${message.from} to ${recipient}:`,
-				error,
-			);
-
-			// Extract email content once to avoid ReadableStream disturbance
-			let emailContent = null;
 			try {
-				const emailStream = await message.raw;
-				emailContent = await new Response(emailStream).text();
-			} catch (contentError) {
-				console.error("Failed to extract email content:", contentError);
+				await message.forward(targetEmail);
+				log(
+					env,
+					`Email from ${message.from} to ${recipient} successfully forwarded to ${targetEmail}`,
+				);
+			} catch (error) {
+				logError(
+					env,
+					`Failed to forward email from ${message.from} to ${recipient}:`,
+					error,
+				);
+
+				let emailContent = null;
+				try {
+					const emailStream = await message.raw;
+					emailContent = await new Response(emailStream).text();
+				} catch (contentError) {
+					logError(env, "Failed to extract email content:", contentError);
+				}
+
+				await saveEmailToR2(env, message, targetEmail, emailContent);
+				await sendDiscordAlert(message, env, error, targetEmail, emailContent);
 			}
-
-			// Save email to R2 bucket as backup
-			await saveEmailToR2(message, env, targetEmail, emailContent);
-
-			// Send Discord alert
-			await sendDiscordAlert(message, env, error, targetEmail, emailContent);
+		} catch (error) {
+			await sendErrorToDiscord(env, error);
 		}
 	},
 
-	async fetch(_request, _env, _ctx) {
-		return new Response("Fail-Safe Email Worker is running");
+	async fetch(request, env, _ctx) {
+		try {
+			const url = new URL(request.url);
+
+			if (url.pathname === "/test-error") {
+				throw new Error("Test error: verifying Discord webhook");
+			}
+
+			return new Response("Fail-Safe Email Worker is running");
+		} catch (error) {
+			await sendErrorToDiscord(env, error);
+			return new Response("Internal Server Error", { status: 500 });
+		}
 	},
 };
 
 /**
  * Save email to R2 bucket as backup
  */
-async function saveEmailToR2(message, env, targetEmail, emailContent) {
+async function saveEmailToR2(env, message, targetEmail, emailContent) {
 	try {
 		const timestamp = new Date().toISOString();
 		const filename = `email-backup-${timestamp}-${message.from.replace(/[^a-zA-Z0-9]/g, "_")}.eml`;
 
-		// Convert email content to ArrayBuffer if provided, otherwise read from stream
 		let emailBuffer;
 		if (emailContent) {
 			const encoder = new TextEncoder();
 			emailBuffer = encoder.encode(emailContent).buffer;
 		} else {
-			// Fallback: read from stream if content not provided
 			const emailStream = await message.raw;
 			emailBuffer = await new Response(emailStream).arrayBuffer();
 		}
 
-		// Save to R2
 		await env.EMAIL_STORAGE.put(filename, emailBuffer, {
 			httpMetadata: {
 				contentType: "message/rfc822",
@@ -117,9 +130,9 @@ async function saveEmailToR2(message, env, targetEmail, emailContent) {
 			},
 		});
 
-		console.log(`Email saved to R2: ${filename}`);
+		log(env, `Email saved to R2: ${filename}`);
 	} catch (error) {
-		console.error("Failed to save email to R2:", error);
+		logError(env, "Failed to save email to R2:", error);
 	}
 }
 
@@ -131,31 +144,26 @@ async function sendDiscordAlert(message, env, error, targetEmail, emailContent) 
 		const webhookUrl = env.DISCORD_WEBHOOK_URL;
 
 		if (!webhookUrl) {
-			console.error("DISCORD_WEBHOOK_URL not configured");
+			logError(env, "DISCORD_WEBHOOK_URL not configured");
 			return;
 		}
 
-		// Process email content for display
 		let displayContent = "Unable to read email content";
 		if (emailContent) {
 			try {
-				// Try to extract the body from the email content
-				// Look for common email body patterns
 				const bodyMatch = emailContent.match(/(?:\r?\n){2,}(.*)/s);
 				if (bodyMatch) {
 					displayContent = bodyMatch[1].trim();
-					// Limit content to 1000 characters to avoid Discord field limits
 					if (displayContent.length > 1000) {
 						displayContent = displayContent.substring(0, 997) + "...";
 					}
 				} else {
-					// If no body found, use a portion of the raw content
-					displayContent = emailContent.length > 1000 
-						? emailContent.substring(0, 997) + "..." 
+					displayContent = emailContent.length > 1000
+						? emailContent.substring(0, 997) + "..."
 						: emailContent;
 				}
 			} catch (contentError) {
-				console.error("Failed to process email content:", contentError);
+				logError(env, "Failed to process email content:", contentError);
 				displayContent = "Error processing email content";
 			}
 		}
@@ -163,7 +171,7 @@ async function sendDiscordAlert(message, env, error, targetEmail, emailContent) 
 		const embed = {
 			title: "🚨 Email Delivery Failed",
 			description: `Failed to forward email from **${message.from}** to **${targetEmail || "unknown target"}**`,
-			color: 0xff0000, // Red color
+			color: 0xff0000,
 			fields: [
 				{
 					name: "From",
@@ -211,16 +219,12 @@ async function sendDiscordAlert(message, env, error, targetEmail, emailContent) 
 			timestamp: new Date().toISOString(),
 		};
 
-		const payload = {
-			embeds: [embed],
-		};
-
 		const response = await fetch(webhookUrl, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify(payload),
+			body: JSON.stringify({ embeds: [embed] }),
 		});
 
 		if (!response.ok) {
@@ -229,8 +233,49 @@ async function sendDiscordAlert(message, env, error, targetEmail, emailContent) 
 			);
 		}
 
-		console.log("Discord alert sent successfully");
-	} catch (error) {
-		console.error("Failed to send Discord alert:", error);
+		log(env, "Discord alert sent successfully");
+	} catch (alertError) {
+		logError(env, "Failed to send Discord alert:", alertError);
+	}
+}
+
+/**
+ * Send a simple error report to Discord for unexpected worker errors
+ */
+async function sendErrorToDiscord(env, error) {
+	try {
+		const webhookUrl = env.DISCORD_WEBHOOK_URL;
+		if (!webhookUrl) return;
+
+		const embed = {
+			title: "⚠️ Unexpected Worker Error",
+			color: 0xff6600,
+			fields: [
+				{
+					name: "Error",
+					value: `\`\`\`${error.message}\`\`\``,
+					inline: false,
+				},
+				{
+					name: "Stack Trace",
+					value: `\`\`\`${(error.stack || "No stack trace").substring(0, 1000)}\`\`\``,
+					inline: false,
+				},
+				{
+					name: "Timestamp",
+					value: new Date().toISOString(),
+					inline: true,
+				},
+			],
+			timestamp: new Date().toISOString(),
+		};
+
+		await fetch(webhookUrl, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ embeds: [embed] }),
+		});
+	} catch (_) {
+		// Last resort — nothing more we can do
 	}
 }
